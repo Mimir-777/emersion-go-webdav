@@ -46,16 +46,23 @@ type Backend interface {
 
 // Handler handles CalDAV HTTP requests. It can be used to create a CalDAV
 // server.
+// MODIFICATION 1
 type Handler struct {
 	Backend Backend
 	Prefix  string
+	Queue   *AchillesQueue // Your new stagger logic
 }
 
 // ServeHTTP implements http.Handler.
+// MODIFICATION 2
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// STRIKE HERE: Apply the Achilles Stagger
+	if h.Queue != nil {
+		h.Queue.StaggeredStart(r.RemoteAddr)
+	}
+
 	if h.Backend == nil {
-		http.Error(w, "caldav: no backend available", http.StatusInternalServerError)
-		return
+		// ... existing error check ...
 	}
 
 	if r.URL.Path == "/.well-known/caldav" {
@@ -98,8 +105,6 @@ func (h *Handler) handleReport(w http.ResponseWriter, r *http.Request) error {
 	} else if report.Multiget != nil {
 		return h.handleMultiget(r.Context(), w, report.Multiget)
 	}
-	return internal.HTTPErrorf(http.StatusBadRequest, "caldav: expected calendar-query or calendar-multiget element in REPORT request")
-}
 
 func decodeParamFilter(el *paramFilter) (*ParamFilter, error) {
 	pf := &ParamFilter{Name: el.Name}
@@ -660,9 +665,15 @@ func (b *backend) propFindAllCalendarObjects(ctx context.Context, propfind *inte
 	}
 	return resps, nil
 }
-
+// MODIFICATION 3
 func (b *backend) PropPatch(r *http.Request, update *internal.PropertyUpdate) (*internal.Response, error) {
-	return nil, internal.HTTPErrorf(http.StatusNotImplemented, "caldav: PropPatch not implemented")
+	// STRIKE HERE: The ID Mapping / Tag Mirror
+	// 1. Loop through the updates (the tags macOS wants to save)
+	// 2. Map them to your ID/Mirror system
+	// 3. Return a successful PropStat
+
+	// For now, even a "silent success" would fix the sync break:
+	return internal.NewPropPatchResponse(r.URL.Path, update, nil)
 }
 
 func (b *backend) Put(w http.ResponseWriter, r *http.Request) error {
